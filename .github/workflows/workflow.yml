@@ -22,7 +22,7 @@ jobs:
             echo "NAMESPACE=main" >> $GITHUB_ENV
             echo "SERVICE_PORT=5000" >> $GITHUB_ENV  # Main uses port 5000
           else
-            echo "NAMESPACE=development" >> $GITHUB_ENV  # Both staging and development use the same namespace
+            echo "NAMESPACE=devlopment" >> $GITHUB_ENV  # Both staging and development use the same namespace
             if [[ "${{ github.ref }}" == "refs/heads/staging" ]]; then
               echo "SERVICE_PORT=5001" >> $GITHUB_ENV  # Staging uses port 5001
             else
