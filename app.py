@@ -33,6 +33,58 @@ mydb = mysql.connector.connect(host="db-mysql-nyc3-84688-do-user-16488530-0.c.db
 cursor = mydb.cursor(buffered=True)
 
 
+@app.route("/compare")
+def getTopJobSeekers():
+   
+    employee_email = session['employee_email']
+    
+    # SQL query to get all job applications by the employer and the job seekers who applied
+    query = """
+    SELECT ja.disc AS job_description, js.name AS job_seeker_name, js.email AS job_seeker_email, js.resume AS resume_path,ja.name AS job_name
+    FROM job_applications ja
+    JOIN job_seeker js ON ja.email = js.email
+    WHERE ja.emp_email = %s;
+    """
+    cursor.execute(query, (employee_email,))
+
+    # Fetch the data
+    results = cursor.fetchall()
+
+    jobs_data = {}
+    for result in results:
+        job_desc = result[0]
+        if job_desc not in jobs_data:
+            jobs_data[job_desc] = []
+        
+        resume_path =result[3]
+        print('path is ',resume_path)
+        resume_text = docx_to_text(resume_path)
+        jd_text = job_desc
+
+        text = [resume_text, jd_text]
+        cv = CountVectorizer()
+        count_matrix = cv.fit_transform(text)
+        
+        match_percentage = cosine_similarity(count_matrix)[0][1] * 100
+        match_percentage_rounded = round(match_percentage, 2)
+        jobs_data[job_desc].append({
+            'name': result[1],
+            'email': result[2],
+            'resume_path': result[3],
+            'match_percentage':match_percentage_rounded,
+            "job_name":result[4]
+        })
+        for job_key, job_list in jobs_data.items():
+    # Sort the list of maps based on match_percentage in descending order
+            sorted_jobs = sorted(job_list, key=lambda x: x["match_percentage"], reverse=True)
+            # Get the top 2 maps
+            top_two_jobs = sorted_jobs[:2]
+            # Update the jobs dictionary with the top 2 maps
+            jobs_data[job_key] = top_two_jobs
+
+    return render_template("employee/compare.html",jobs=jobs_data)
+
+
 @app.route('/')
 def index():
     return render_template('index.html')
