@@ -8,7 +8,6 @@ on:
       - staging
       - main
       
-
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
@@ -54,13 +53,13 @@ jobs:
       - name: Verify deployment
         run: |
           if ! kubectl rollout status deployment/${{ env.BRANCH_NAME }} -n ${{ env.BRANCH_NAME }}; then
-            doctl registry repository delete ${{ secrets.REGISTRY_NAME }}/${{ env.BRANCH_NAME }}:$(echo $GITHUB_SHA | head -c7) --force
+            doctl registry repository delete ${{ secrets.REGISTRY_NAME }}/${{ env.BRANCH_NAME }}:$(echo $GITHUB_SHA | head -c7) 
             exit 1
           fi
 
       - name: List all tags for the image
         run: |
-          IMAGE_NAME=${{ secrets.REGISTRY_NAME }}/${{ env.BRANCH_NAME }}
+          IMAGE_NAME=${{ env.BRANCH_NAME }}
           doctl registry repository list-tags $IMAGE_NAME --format Tag --no-header
       
               
@@ -70,5 +69,16 @@ jobs:
           IMAGE_TAG=$(echo $GITHUB_SHA | head -c7)
           PREVIOUS_TAG=$(doctl registry repository list-tags ${{ env.BRANCH_NAME }} --format Tag --no-header | grep -v $IMAGE_TAG | tail -n 1)
           if [ -n "$PREVIOUS_TAG" ]; then
-            doctl registry repository delete $IMAGE_NAME:$PREVIOUS_TAG --force
+            doctl registry repository delete $IMAGE_NAME:$PREVIOUS_TAG 
           fi
+      - name: Get External IP of the Service
+        id: get_ip
+        run: |
+          IP=$(kubectl get service devlopment -o=jsonpath='{.status.loadBalancer.ingress[0].ip}' -n ${{ env.BRANCH_NAME }} )
+          echo "EXTERNAL_IP=$IP" >> $GITHUB_ENV
+          echo "::set-output name=external_ip::$IP:5000"
+
+      - name: Use External IP
+        run: |
+          echo "Using External IP: ${{ steps.get_ip.outputs.external_ip }}"
+          # Further commands using the External IP
