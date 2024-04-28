@@ -28,7 +28,7 @@ app = Flask(__name__)
 app.secret_key = 'your_secret_key_here'
 app.config['uploadfolder'] = "static/"
 
-mydb = mysql.connector.connect(host="db-mysql-nyc3-37516-devlopment-do-user-16025762-0.c.db.ondigitalocean.com",port=25060, user="doadmin", password="AVNS_-LGlQgWL5u2tMGbNJIP", database="defaultdb",auth_plugin='mysql_native_password')
+mydb = mysql.connector.connect(host="",port=25060, user="doadmin", password="", database="defaultdb",auth_plugin='mysql_native_password')
 cursor = mydb.cursor(buffered=True)
 
 
