@@ -21,12 +21,15 @@ jobs:
           if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
             echo "NAMESPACE=main" >> $GITHUB_ENV
             echo "SERVICE_PORT=5000" >> $GITHUB_ENV  # Main uses port 5000
+            echo "NAME=main" >> $GITHUB_ENV
           else
             echo "NAMESPACE=devlopment" >> $GITHUB_ENV  # Both staging and development use the same namespace
             if [[ "${{ github.ref }}" == "refs/heads/staging" ]]; then
               echo "SERVICE_PORT=5001" >> $GITHUB_ENV  # Staging uses port 5001
+              echo "NAME=staging" >> $GITHUB_ENV
             else
               echo "SERVICE_PORT=5000" >> $GITHUB_ENV  # Development uses port 5000
+              echo "NAME=devlopment" >> $GITHUB_ENV
             fi
           fi
           echo "IMAGE_TAG=${GITHUB_SHA::7}" >> $GITHUB_ENV
@@ -47,7 +50,7 @@ jobs:
         run: docker push ${{ secrets.REGISTRY_NAME }}/${{ env.NAMESPACE }}:$(echo $GITHUB_SHA | head -c7)
       
       - name: Update deployment file
-        run: TAG=$(echo $GITHUB_SHA | head -c7) && sed -i 's|<SERVICE_PORT>|${{ env.SERVICE_PORT }}|' $GITHUB_WORKSPACE/config/deployment.yml && sed -i 's|<IMAGE>|${{ secrets.REGISTRY_NAME }}/${{ env.NAMESPACE }}:'${TAG}'|' $GITHUB_WORKSPACE/config/deployment.yml && sed -i 's|<NAME>|${{ env.NAMESPACE }}|' $GITHUB_WORKSPACE/config/deployment.yml
+        run: TAG=$(echo $GITHUB_SHA | head -c7) && sed -i 's|<SERVICE_PORT>|${{ env.SERVICE_PORT }}|' $GITHUB_WORKSPACE/config/deployment.yml && sed -i 's|<IMAGE>|${{ secrets.REGISTRY_NAME }}/${{ env.NAMESPACE }}:'${TAG}'|' $GITHUB_WORKSPACE/config/deployment.yml && sed -i 's|<NAME>|${{ env.NAME }}|' $GITHUB_WORKSPACE/config/deployment.yml
       
       - name: Save DigitalOcean kubeconfig with short-lived credentials
         run: doctl kubernetes cluster kubeconfig save --expiry-seconds 600 ${{ secrets.CLUSTER_NAME }}
