@@ -74,7 +74,7 @@ jobs:
       - name: Get External IP of the Service
         id: get_ip
         run: |
-          IP=$(kubectl get service devlopment -o=jsonpath='{.status.loadBalancer.ingress[0].ip}' -n ${{ env.BRANCH_NAME }} )
+          IP=$(kubectl get service ${{ env.BRANCH_NAME }}  -o=jsonpath='{.status.loadBalancer.ingress[0].ip}' -n ${{ env.BRANCH_NAME }} )
           echo "EXTERNAL_IP=$IP" >> $GITHUB_ENV
           echo "::set-output name=external_ip::$IP:5000"
 
