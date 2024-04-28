@@ -28,7 +28,6 @@ app = Flask(__name__)
 app.secret_key = 'your_secret_key_here'
 app.config['uploadfolder'] = "static/"
 
-# mydb = mysql.connector.connect(host="db-mysql-nyc3-37516-devlopment-do-user-16025762-0.c.db.ondigitalocean.com", user="doadmin", password="AVNS_-LGlQgWL5u2tMGbNJIP",auth_plugin='mysql_native_password')
 mydb = mysql.connector.connect(host="db-mysql-nyc3-84688-do-user-16488530-0.c.db.ondigitalocean.com",port=25060, user="doadmin", password="AVNS_wFlxjbF-EvMvVwns3uP", database="defaultdb",auth_plugin='mysql_native_password')
 cursor = mydb.cursor(buffered=True)
 
@@ -49,30 +48,18 @@ def signup():
 @app.route('/j_register', methods=["GET", "POST"])
 def j_register():
     if request.method == 'POST':
-        name = request.form["name"]
-        email = request.form["email"]
-        password =request.form["password"]
-        c_password = request.form["c_password"]
-        mobile = request.form["mobile"]
-        address =  request.form["address"]
-        gender = request.form["gender"]
-        age = request.form["age"]
-        state = request.form["state"]
-        district =  request.form["district"]
+        name = request.form['name']
+        email = request.form['email']
+        password = request.form['password']
+        c_password = request.form['c_password']
+        mobile = request.form['mobile']
+        address = request.form['address']
+        gender = request.form['gender']
+        age = request.form['age']
+        state = request.form['state']
+        district = request.form['district']
         image = request.files['image']
-        resume =  request.files['resume']
-        # name = request.form.get("name")
-        # email = request.form.get("email")
-        # password =request.form.get("password")
-        # c_password = request.form.get("c_password")
-        # mobile = request.form.get("mobile")
-        # address =  request.form.get("address")
-        # gender = request.form.get("gender")
-        # age = request.form.get("age")
-        # state = request.form.get("state")
-        # district =  request.form.get("district")
-        # image = request.form.get("image")
-        # resume =  request.form.get("resume")
+        resume = request.files['resume']
 
         fn1=image.filename
         mypath1=os.path.join('static/photos/', fn1)
@@ -252,10 +239,7 @@ def signup1():
 
 @app.route('/e_register', methods=["GET", "POST"])
 def e_register():
-    print("method is in e_register ",request.method)
     if request.method == 'POST':
-        print("here came ")
-        print(request.form)
         name = request.form['name']
         email = request.form['email']
         password = request.form['password']
@@ -863,9 +847,54 @@ def load():
 
 @app.route("/compare")
 def getTopJobSeekers():
-    voters = pd.read_sql_query('SELECT * FROM job_seeker', mydb)
-    all_emails = voters.email.values
-    return "hi"
+   
+    employee_email = session['employee_email']
+    
+    # SQL query to get all job applications by the employer and the job seekers who applied
+    query = """
+    SELECT ja.disc AS job_description, js.name AS job_seeker_name, js.email AS job_seeker_email, js.resume AS resume_path,ja.name AS job_name
+    FROM job_applications ja
+    JOIN job_seeker js ON ja.email = js.email
+    WHERE ja.emp_email = %s;
+    """
+    cursor.execute(query, (employee_email,))
+
+    # Fetch the data
+    results = cursor.fetchall()
+
+    jobs_data = {}
+    for result in results:
+        job_desc = result[0]
+        if job_desc not in jobs_data:
+            jobs_data[job_desc] = []
+        
+        resume_path =result[3]
+        print('path is ',resume_path)
+        resume_text = docx_to_text(resume_path)
+        jd_text = job_desc
+
+        text = [resume_text, jd_text]
+        cv = CountVectorizer()
+        count_matrix = cv.fit_transform(text)
+        
+        match_percentage = cosine_similarity(count_matrix)[0][1] * 100
+        match_percentage_rounded = round(match_percentage, 2)
+        jobs_data[job_desc].append({
+            'name': result[1],
+            'email': result[2],
+            'resume_path': result[3],
+            'match_percentage':match_percentage_rounded,
+            "job_name":result[4]
+        })
+        for job_key, job_list in jobs_data.items():
+    # Sort the list of maps based on match_percentage in descending order
+            sorted_jobs = sorted(job_list, key=lambda x: x["match_percentage"], reverse=True)
+            # Get the top 2 maps
+            top_two_jobs = sorted_jobs[:2]
+            # Update the jobs dictionary with the top 2 maps
+            jobs_data[job_key] = top_two_jobs
+
+    return render_template("employee/compare.html",jobs=jobs_data)
 
 
 @app.route("/appliedjobs")
@@ -1005,5 +1034,4 @@ def decline():
 
 
 if __name__ == '__main__':
-    port = int(os.getenv('PORT', 5000))
-    app.run(host='0.0.0.0',debug=True,port=port)
+    app.run(host='0.0.0.0',debug=True,port=5000)
