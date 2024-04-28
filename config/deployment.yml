@@ -29,7 +29,7 @@ spec:
         - containerPort: <SERVICE_PORT>
         env:
         - name: PORT
-          value: <SERVICE_PORT>
+          value: "<SERVICE_PORT>"
         resources:
           requests:
             cpu: 100m
