@@ -11,29 +11,15 @@ on:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    if: contains(github.event.head_commit.message, 'Merge pull request')
+    # if: contains(github.event.head_commit.message, 'Merge pull request')
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
 
       - name: Set up environment variables
         run: |
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            echo "NAMESPACE=main" >> $GITHUB_ENV
-            echo "SERVICE_PORT=5000" >> $GITHUB_ENV  # Main uses port 5000
-            echo "NAME=main" >> $GITHUB_ENV
-          else
-            echo "NAMESPACE=devlopment" >> $GITHUB_ENV  # Both staging and development use the same namespace
-            if [[ "${{ github.ref }}" == "refs/heads/staging" ]]; then
-              echo "SERVICE_PORT=5001" >> $GITHUB_ENV  # Staging uses port 5001
-              echo "NAME=staging" >> $GITHUB_ENV
-            else
-              echo "SERVICE_PORT=5000" >> $GITHUB_ENV  # Development uses port 5000
-              echo "NAME=devlopment" >> $GITHUB_ENV
-            fi
-          fi
+          echo "BRANCH_NAME=${GITHUB_REF#refs/heads/}" >> $GITHUB_ENV
           echo "IMAGE_TAG=${GITHUB_SHA::7}" >> $GITHUB_ENV
-          
       
       - name: Install doctl
         uses: digitalocean/action-doctl@v2
@@ -41,58 +27,58 @@ jobs:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
       
       - name: Build container image
-        run: docker build -t ${{ secrets.REGISTRY_NAME }}/${{ env.NAMESPACE }}:$(echo $GITHUB_SHA | head -c7) .
+        run: docker build -t ${{ secrets.REGISTRY_NAME }}/${{ env.BRANCH_NAME }}:$(echo $GITHUB_SHA | head -c7) .
       
       - name: Log in to DigitalOcean Container Registry with short-lived credentials
         run: doctl registry login --expiry-seconds 1200
       
       - name: Push image to DigitalOcean Container Registry
-        run: docker push ${{ secrets.REGISTRY_NAME }}/${{ env.NAMESPACE }}:$(echo $GITHUB_SHA | head -c7)
+        run: docker push ${{ secrets.REGISTRY_NAME }}/${{ env.BRANCH_NAME }}:$(echo $GITHUB_SHA | head -c7)
       
       - name: Update deployment file
-        run: TAG=$(echo $GITHUB_SHA | head -c7) && sed -i 's|<LOADBALANCE_NAME>|${{ env.NAMESPACE }}|' $GITHUB_WORKSPACE/config/deployment.yml && sed -i 's|<SERVICE_PORT>|${{ env.SERVICE_PORT }}|' $GITHUB_WORKSPACE/config/deployment.yml && sed -i 's|<IMAGE>|${{ secrets.REGISTRY_NAME }}/${{ env.NAMESPACE }}:'${TAG}'|' $GITHUB_WORKSPACE/config/deployment.yml && sed -i 's|<NAME>|${{ env.NAME }}|' $GITHUB_WORKSPACE/config/deployment.yml
+        run: TAG=$(echo $GITHUB_SHA | head -c7) && sed -i 's|<IMAGE>|${{ secrets.REGISTRY_NAME }}/${{ env.BRANCH_NAME }}:'${TAG}'|' $GITHUB_WORKSPACE/config/deployment.yml && sed -i 's|<NAME>|${{ env.BRANCH_NAME }}|' $GITHUB_WORKSPACE/config/deployment.yml
       
       - name: Save DigitalOcean kubeconfig with short-lived credentials
         run: doctl kubernetes cluster kubeconfig save --expiry-seconds 600 ${{ secrets.CLUSTER_NAME }}
       
-      - name: Check if ${{ env.NAMESPACE }} namespace exists
+      - name: Check if ${{ env.BRANCH_NAME }} namespace exists
         run: |
-          if ! kubectl get namespace ${{ env.NAMESPACE }}; then
-            kubectl create namespace ${{ env.NAMESPACE }}
+          if ! kubectl get namespace ${{ env.BRANCH_NAME }}; then
+            kubectl create namespace ${{ env.BRANCH_NAME }}
           fi
       
-      - name: Deploy to ${{ env.NAMESPACE }} namespace
-        run: kubectl apply -f $GITHUB_WORKSPACE/config/deployment.yml -n ${{ env.NAMESPACE }}
+      - name: Deploy to ${{ env.BRANCH_NAME }} namespace
+        run: kubectl apply -f $GITHUB_WORKSPACE/config/deployment.yml -n ${{ env.BRANCH_NAME }}
       
       - name: Verify deployment
         run: |
-          if ! kubectl rollout status deployment/${{ env.NAMESPACE }} -n ${{ env.NAMESPACE }}; then
-            doctl registry repository delete ${{ secrets.REGISTRY_NAME }}/${{ env.NAMESPACE }}:$(echo $GITHUB_SHA | head -c7) 
+          if ! kubectl rollout status deployment/${{ env.BRANCH_NAME }} -n ${{ env.BRANCH_NAME }}; then
+            doctl registry repository delete ${{ secrets.REGISTRY_NAME }}/${{ env.BRANCH_NAME }}:$(echo $GITHUB_SHA | head -c7) 
             exit 1
           fi
 
       - name: List all tags for the image
         run: |
-          IMAGE_NAME=${{ env.NAMESPACE }}
+          IMAGE_NAME=${{ env.BRANCH_NAME }}
           doctl registry repository list-tags $IMAGE_NAME --format Tag --no-header
       
               
-      # - name: Delete previous image from DigitalOcean Container Registry
-      #   run: |
-      #     IMAGE_NAME=${{ secrets.REGISTRY_NAME }}/${{ env.NAMESPACE }}
-      #     IMAGE_TAG=$(echo $GITHUB_SHA | head -c7)
-      #     PREVIOUS_TAG=$(doctl registry repository list-tags ${{ env.NAMESPACE }} --format Tag --no-header | grep -v $IMAGE_TAG | tail -n 1)
-      #     if [ -n "$PREVIOUS_TAG" ]; then
-      #       doctl registry repository delete $IMAGE_NAME:$PREVIOUS_TAG 
-      #     fi
+      - name: Delete previous image from DigitalOcean Container Registry
+        run: |
+          IMAGE_NAME=${{ secrets.REGISTRY_NAME }}/${{ env.BRANCH_NAME }}
+          IMAGE_TAG=$(echo $GITHUB_SHA | head -c7)
+          PREVIOUS_TAG=$(doctl registry repository list-tags ${{ env.BRANCH_NAME }} --format Tag --no-header | grep -v $IMAGE_TAG | tail -n 1)
+          if [ -n "$PREVIOUS_TAG" ]; then
+            doctl registry repository delete $IMAGE_NAME:$PREVIOUS_TAG 
+          fi
       - name: Get External IP of the Service
         id: get_ip
         run: |
-          IP=$(kubectl get service ${{ env.NAMESPACE }} -o=jsonpath='{.status.loadBalancer.ingress[0].ip}' -n ${{ env.NAMESPACE }} )
+          IP=$(kubectl get service ${{ env.BRANCH_NAME }}  -o=jsonpath='{.status.loadBalancer.ingress[0].ip}' -n ${{ env.BRANCH_NAME }} )
           echo "EXTERNAL_IP=$IP" >> $GITHUB_ENV
           echo "::set-output name=external_ip::$IP:5000"
 
       - name: Use External IP
         run: |
-          echo "Using External IP: http://${{ steps.get_ip.outputs.external_ip }}"
+          echo "Using External IP: ${{ steps.get_ip.outputs.external_ip }}"
           # Further commands using the External IP
