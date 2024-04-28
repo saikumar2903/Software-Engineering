@@ -15,4 +15,3 @@ recruiters. Our target customers are job seekers looking for opportunities that 
 skills and career goals and Recruiters looking for qualified candidates for their job listings.
 We aim to offer our services to job seekers for free to encourage more users to join the
 platform while charging recruiters a fee for access our portal.
-
