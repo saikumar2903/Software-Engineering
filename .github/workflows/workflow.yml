@@ -16,6 +16,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
+       - name: Lint Code
+        run: flake8 .
+
+      - name: Run Unit Tests
+        run: pytest 
+
       - name: Set up environment variables
         run: |
           echo "BRANCH_NAME=${GITHUB_REF#refs/heads/}" >> $GITHUB_ENV
